@@ -311,7 +311,7 @@ class oxcSERVERmenuitem:
         list2.clear()
         i = 0
         for network in self.all['network']:
-            if self.all['network'][network]['bridge'] != "xapi0":
+            if self.all['network'][network]['bridge'] != "xenapi":
                 if "automatic" in self.all['network'][network]['other_config'] and \
                         self.all['network'][network]['other_config']["automatic"] == "true":
                     list.append(["interface " + str(i), "auto-generated",
@@ -324,7 +324,7 @@ class oxcSERVERmenuitem:
         i = 0
         current = 0
         for network in self.all['network']:
-            if self.all['network'][network]['bridge'] != "xapi0":
+            if self.all['network'][network]['bridge'] != "xenapi":
                 if self.all['network'][network]['PIFs'] \
                         and self.all['PIF'][self.all['network'][network]['PIFs'][0]]['bond_slave_of'] == "OpaqueRef:NULL":
                     if network == network_ref:
@@ -488,7 +488,6 @@ class oxcSERVERmenuitem:
                                              res["ErrorDescription"][1]))
 
     def add_server_to_pool(self, widget, ref, server, server_ref, master_ip):
-        self.wine.xc_servers[server].all['host'][server_ref]
         user = self.wine.xc_servers[server].user
         password = self.wine.xc_servers[server].password
         host = master_ip
@@ -510,7 +509,6 @@ class oxcSERVERmenuitem:
         server = data[0]
         server_ref = data[1]
         master_ip = data[2]
-        self.wine.xc_servers[server].all['host'][server_ref]
         user = self.wine.xc_servers[server].user
         password = self.wine.xc_servers[server].password
         host = master_ip

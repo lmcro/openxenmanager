@@ -87,7 +87,9 @@ class oxcWindowMenuItem:
         """
         Add server: show the window for add a new server
         """
-        self.builder.get_object("addserver").show()
+        #self.builder.get_object("addserver").show()
+        add_server = AddServer(self)
+        add_server.show_dialog()
 
     # VM
     # Make Into Template
@@ -355,7 +357,8 @@ class oxcWindowMenuItem:
 
     #TOOLBAR
     def on_tb_addserver_clicked(self, widget):
-        AddServer(self.builder)
+        add_server = AddServer(self)
+        add_server.show_dialog()
 
     def on_tb_start_clicked(self, widget, data=None):
         """
@@ -1306,12 +1309,11 @@ class oxcWindowMenuItem:
         import webbrowser
         webbrowser.open(url)
 
-    @staticmethod
     def on_menuitem_xenserver_on_the_web_activate(self, widget, data=None):
         """
         "Xenserver on the web" menu item is pressed (help)
         """
-        url = "www.xenserver.com"
+        url = "http://www.xenserver.com"
         import webbrowser
         webbrowser.open(url)
 

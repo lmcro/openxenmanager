@@ -28,6 +28,7 @@ class oxcWindowStorage:
     Class to manage "storage" elements
     """
     reattach_lun = None
+
     def on_rescanisos_clicked(self, widget, data=None):
         self.xc_servers[self.selected_host].rescan_isos(self.selected_ref)
 
@@ -76,7 +77,7 @@ class oxcWindowStorage:
         self.builder.get_object("newstorage").hide()
 
     def on_treehbalun_cursor_changed(self, widget, data=None):
-        listhbalun =  self.builder.get_object("listhbalun")
+        listhbalun = self.builder.get_object("listhbalun")
         selection = widget.get_selection()
         if selection.get_selected()[1]:
             iter = selection.get_selected()[1]
@@ -87,18 +88,21 @@ class oxcWindowStorage:
                 self.builder.get_object("finishnewstorage").set_sensitive(False)
         else:
             self.builder.get_object("finishnewstorage").set_sensitive(False)
+
     def on_cancelnewstgreattachnfs_clicked(self, widget, data=None):
         """
         Function called when you press cancel on "reattach window storage" (nfs)
         """
         # Hide confirmation window
         self.builder.get_object("newstgreattachnfs").hide()
+
     def on_cancelnewstgreattachaoe_clicked(self, widget, data=None):
         """
         Function called when you press cancel on "reattach window storage" (aoe)
         """
         # Hide confirmation window
         self.builder.get_object("newstgreattachaoe").hide()
+
     def on_finishnewstorage_clicked(self, widget, data=None):
         """
         Function called when you press "Finish" on new storage wizard
@@ -125,23 +129,17 @@ class oxcWindowStorage:
                 self.builder.get_object("newstorage").hide()
         elif page == 2:
             # iSCSI
-            name = self.builder.get_object("txtiscsiname").get_text()
-            host = self.builder.get_object("txtiscsitarget").get_text()
-            port = self.builder.get_object("txtiscsiport").get_text()
-            chapuser = None
-            chapsecret = None
-            if self.builder.get_object("checkscsichap").get_active():
-                chapuser = self.builder.get_object("txtiscsichapuser").get_text()
-                chapsecret = self.builder.get_object("txtiscsichapsecret").get_text()
-
-            combotargetiqn = self.builder.get_object("combotargetiqn")
-            listtargetiqn = self.builder.get_object("listtargetiqn")
-            combotargetlun = self.builder.get_object("combotargetlun")
-            listtargetlun = self.builder.get_object("listtargetlun")
-            targetiqn = listtargetiqn.get_value(combotargetiqn.get_active_iter(), 0)
-            targetlun = listtargetlun.get_value(combotargetlun.get_active_iter(), 0)
-            self.reattach_lun = self.xc_servers[self.selected_host].check_iscsi(self.selected_ref, name, host, port, targetlun, targetiqn, chapuser, chapsecret)
-            if self.reattach_lun: 
+            details = self.get_iscsi_con_details()
+            self.reattach_lun = self.xc_servers[
+                self.selected_host].check_iscsi(self.selected_ref,
+                                                details['name'],
+                                                details['host'],
+                                                details['port'],
+                                                details['target']['lun'],
+                                                details['target']['iqn'],
+                                                details['chap']['user'],
+                                                details['chap']['secret'])
+            if self.reattach_lun:
                 # If create_iscsi return an uuid.. then ask confirmation for reattach, format or cancel
                 self.builder.get_object("reattachformatiscsidisk").show()
             else:
@@ -176,7 +174,7 @@ class oxcWindowStorage:
                     self.builder.get_object("reattachformathbalun").show()
                     label = self.builder.get_object("reattachformathbalun").get_children()[0].get_children()[0].get_children()[1].get_children()[0]
                     label.set_text(label.get_text().replace("{0}", option[1]))
-    
+
         elif page == 4:
             # CIFS ISO
             name = self.builder.get_object("txtnewstgcifsname").get_text()
@@ -190,18 +188,20 @@ class oxcWindowStorage:
                 password = ""
             # Check if is a reattach or a new attach
             if self.reattach_storage:
-                 # reattach_nfs_iso returns 0 if iso library was attached correctly
-                if self.xc_servers[self.selected_host].reattach_cifs_iso(self.selected_ref, name, \
-                        sharename, options, username,password) == 0:
+                # reattach_nfs_iso returns 0 if iso library was attached correctly
+                if self.xc_servers[self.selected_host].reattach_cifs_iso(
+                        self.selected_ref, name, sharename, options, username,
+                        password) == 0:
                         # hide the window
                         self.builder.get_object("newstorage").hide()
             else:
                 # create_cifs_iso returns 0 if iso library was attached correctly
-                if self.xc_servers[self.selected_host].create_cifs_iso(self.selected_ref, name, \
-                        sharename, options, username,password) == 0:
+                if self.xc_servers[self.selected_host].create_cifs_iso(
+                        self.selected_ref, name, sharename, options, username,
+                        password) == 0:
                     # hide the window
                     self.builder.get_object("newstorage").hide()
-            pass
+
         elif page == 5:
             # NFS ISO
             name = self.builder.get_object("txtnewstgnfsisoname").get_text()
@@ -220,7 +220,7 @@ class oxcWindowStorage:
                     # hide the window
                     self.builder.get_object("newstorage").hide()
         if page == 6:
-            # Experimental AOE 
+            # Experimental AOE
             name = self.builder.get_object("txtnewstgaoename").get_text()
             path = self.builder.get_object("txtnewstgaoepath").get_text()
             create = self.builder.get_object("radiocreatenewaoe").get_active()
@@ -240,14 +240,15 @@ class oxcWindowStorage:
 
     def on_cancelformatdisklun_clicked(self, widget, data=None):
         """
-        Function called when you cancel format disk confirmation (hba) 
+        Function called when you cancel format disk confirmation (hba)
         """
         self.builder.get_object("formatdisklun").hide()
+
     def on_accepformatdisklun_clicked(self, widget, data=None):
         """
-        Function called when you accept format disk confirmation (hba) 
+        Function called when you accept format disk confirmation (hba)
         and function called when you choose Format button on reattach/format
-        disk confirmation (hba) 
+        disk confirmation (hba)
         """
         treehbalun = self.builder.get_object("treehbalun")
         listhbalun = self.builder.get_object("listhbalun")
@@ -262,19 +263,22 @@ class oxcWindowStorage:
 
         self.builder.get_object("formatdisklun").hide()
         self.builder.get_object("newstorage").hide()
+
     def on_acceptdetachhbalun_clicked(self, widget, data=None):
         """
         Function called when you accept information dialog informing you must detach the SR
         """
         self.builder.get_object("detachhbalun").hide()
+
     def on_cancelreattachhbalun_clicked(self, widget, data=None):
         """
-        Function called when you cancel reattach disk confirmation (hba) 
+        Function called when you cancel reattach disk confirmation (hba)
         """
         self.builder.get_object("reattachhbalun").hide()
+
     def on_acceptreattachhbalun_clicked(self, widget, data=None):
         """
-        Function called when you accept reattach disk confirmation (hba) 
+        Function called when you accept reattach disk confirmation (hba)
         """
         treehbalun = self.builder.get_object("treehbalun")
         listhbalun = self.builder.get_object("listhbalun")
@@ -290,9 +294,10 @@ class oxcWindowStorage:
         self.builder.get_object("reattachhbalun").hide()
         if option == 0:
             self.builder.get_object("newstorage").hide()
+
     def on_acceptareattachformathbalun_clicked(self, widget, data=None):
         """
-        Function called when you press reattach button reattach/format disk confirmation (hba) 
+        Function called when you press reattach button reattach/format disk confirmation (hba)
         """
         treehbalun = self.builder.get_object("treehbalun")
         listhbalun = self.builder.get_object("listhbalun")
@@ -308,9 +313,10 @@ class oxcWindowStorage:
         self.builder.get_object("reattachformathbalun").hide()
         if option == 0:
             self.builder.get_object("newstorage").hide()
+
     def on_cancelreattachformathbalun_clicked(self, widget, data=None):
         """
-        Function called when you cancel reattach/format disk confirmation (hba) 
+        Function called when you cancel reattach/format disk confirmation (hba)
         """
         self.builder.get_object("reattachformathbalun").hide()
 
@@ -318,23 +324,13 @@ class oxcWindowStorage:
         """
         Function called when you accept "format" scsi lun confirmation dialog
         """
-        name = self.builder.get_object("txtiscsiname").get_text()
-        host = self.builder.get_object("txtiscsitarget").get_text()
-        port = self.builder.get_object("txtiscsiport").get_text()
-        chapuser = None
-        chapsecret = None
-        if self.builder.get_object("checkscsichap").get_active():
-            chapuser = self.builder.get_object("txtiscsichapuser").get_text()
-            chapsecret = self.builder.get_object("txtiscsichapsecret").get_text()
-
-        combotargetiqn = self.builder.get_object("combotargetiqn")
-        listtargetiqn = self.builder.get_object("listtargetiqn")
-        combotargetlun = self.builder.get_object("combotargetlun")
-        listtargetlun = self.builder.get_object("listtargetlun")
-        targetiqn = listtargetiqn.get_value(combotargetiqn.get_active_iter(), 0)
-        targetlun = listtargetlun.get_value(combotargetlun.get_active_iter(), 0)
+        details = self.get_iscsi_con_details()
         # Create formating the SCSI lun
-        self.xc_servers[self.selected_host].create_iscsi(self.selected_ref, name, host, port, targetlun, targetiqn, chapuser, chapsecret)
+        self.xc_servers[self.selected_host].create_iscsi(
+            self.selected_ref, details['name'], details['host'],
+            details['port'], details['target']['lun'],
+            details['target']['iqn'], details['chap']['user'],
+            details['chap']['secret'])
         # Hide the dialog
         self.builder.get_object("formatiscsidisk").hide()
         self.builder.get_object("reattachformatiscsidisk").hide()
@@ -345,23 +341,13 @@ class oxcWindowStorage:
         """
         Function called when you choose "reattach" scsi lun confirmation dialog
         """
-        name = self.builder.get_object("txtiscsiname").get_text()
-        host = self.builder.get_object("txtiscsitarget").get_text()
-        port = self.builder.get_object("txtiscsiport").get_text()
-        chapuser = None
-        chapsecret = None
-        if self.builder.get_object("checkscsichap").get_active():
-            chapuser = self.builder.get_object("txtiscsichapuser").get_text()
-            chapsecret = self.builder.get_object("txtiscsichapsecret").get_text()
-
-        combotargetiqn = self.builder.get_object("combotargetiqn")
-        listtargetiqn = self.builder.get_object("listtargetiqn")
-        combotargetlun = self.builder.get_object("combotargetlun")
-        listtargetlun = self.builder.get_object("listtargetlun")
-        targetiqn = listtargetiqn.get_value(combotargetiqn.get_active_iter(), 0)
-        targetlun = listtargetlun.get_value(combotargetlun.get_active_iter(), 0)
+        details = self.get_iscsi_con_details()
         # Reattach the SCSI lun
-        self.xc_servers[self.selected_host].reattach_iscsi(self.selected_ref, name, host, port, targetlun, targetiqn, chapuser, chapsecret, self.reattach_lun)
+        self.xc_servers[self.selected_host].reattach_iscsi(
+            self.selected_ref, details['name'], details['host'],
+            details['port'], details['target']['lun'],
+            details['target']['iqn'], details['chap']['user'],
+            details['chap']['secret'], self.reattach_lun)
 
         # Hide the dialog
         self.builder.get_object("reattachformatiscsidisk").hide()
@@ -374,24 +360,24 @@ class oxcWindowStorage:
         """
         # Hide the dialog
         self.builder.get_object("formatiscsidisk").hide()
+
     def on_cancelreattachscsidisk_clicked(self, widget, data=None):
         """
         Function called when you cancel "reattach format" scsi lun confirmation dialog
         """
         # Hide the dialog
         self.builder.get_object("reattachformatiscsidisk").hide()
+
     def on_nextnewstorage_clicked(self, widget, data=None):
         """
         Function called when you press "Next" on new storage wizard
         """
-        mapping = {
-                    "radionewstgnfsvhd" : 1,  
-                    "radionewstgiscsi" : 2,
-                    "radionewstghwhba" : 3,
-                    "radionewstgcifs" : 4, 
-                    "radionewstgnfsiso": 5,
-                    "radionewstgaoe": 6
-                  }
+        mapping = {"radionewstgnfsvhd": 1,
+                   "radionewstgiscsi": 2,
+                   "radionewstghwhba": 3,
+                   "radionewstgcifs": 4,
+                   "radionewstgnfsiso": 5,
+                   "radionewstgaoe": 6}
         for radio in mapping:
             if self.builder.get_object(radio).get_active():
                 # Set the correct tab for selected storage type
@@ -434,13 +420,12 @@ class oxcWindowStorage:
                 # no LUNs found
                 self.builder.get_object("tabboxnewstorage").set_current_page(0)
 
-            
-
     def on_cancelnewstorage_clicked(self, widget, data=None):
         """
         Function called when you press "Cancel" on new storage wizard
         """
         self.builder.get_object("newstorage").hide()
+
     def on_previousnewstorage_clicked(self, widget, data=None):
         """
         Function called when you press "Previous" on new storage wizard
@@ -450,12 +435,14 @@ class oxcWindowStorage:
         widget.set_sensitive(False)
         # Enable Next button
         self.builder.get_object("nextnewstorage").set_sensitive(True)
+
     def on_radioreattachsr_toggled(self, widget, data=None):
         """
         Function called when you choose "Reattach an existing SR" radio on new storage (nfs)
         """
         # Enable tree with possible attach storage if radio is selected
         self.builder.get_object("treereattachnewstgnfs").set_sensitive(widget.get_active())
+
     def on_btnewstgsnfsscan_clicked(self, widget, data=None):
         """
         Function called when you press on "Scan" button on new storage (nfs)
@@ -479,19 +466,19 @@ class oxcWindowStorage:
             treereattachnewstgnfs = self.builder.get_object("treereattachnewstgnfs")
             treereattachnewstgnfs.set_cursor((0,), treereattachnewstgnfs.get_column(0))
             treereattachnewstgnfs.get_selection().select_path((0, 0))
-
         else:
             # Connection ERROR
             self.builder.get_object("treereattachnewstgnfs").set_sensitive(False)
             self.builder.get_object("radioreattachsr").set_sensitive(False)
             self.builder.get_object("finishnewstorage").set_sensitive(False)
+
     def on_btnewstgsaoescan_clicked(self, widget, data=None):
         """
         Function called when you press on "Scan" button on new storage (aoe)
         """
         path = self.builder.get_object("txtnewstgaoepath").get_text()
         listreattachnewstgaoe = self.builder.get_object("listreattachnewstgaoe")
-        # Scan for AOE on selected device 
+        # Scan for AOE on selected device
         result = self.xc_servers[self.selected_host].scan_aoe(self.selected_ref, listreattachnewstgaoe, path)
         if result == 1:
             # Connection OK, but not exists previous SR
@@ -507,7 +494,6 @@ class oxcWindowStorage:
             treereattachnewstgaoe = self.builder.get_object("treereattachnewstgaoe")
             treereattachnewstgaoe.set_cursor((0,), treereattachnewstgaoe.get_column(0))
             treereattachnewstgaoe.get_selection().select_path((0, 0))
-
         else:
             # Connection ERROR
             self.builder.get_object("treereattachnewstgaoe").set_sensitive(False)
@@ -520,7 +506,7 @@ class oxcWindowStorage:
         """
         X = "\\\\(\S+)\\\\(\S+)"
         c = re.compile(X).search(widget.get_text())
-        self.builder.get_object("finishnewstorage").set_sensitive(c != None)
+        self.builder.get_object("finishnewstorage").set_sensitive(c is not None)
 
     def on_txtnewstgnfsisopath_changed(self, widget, data=None):
         """
@@ -528,7 +514,7 @@ class oxcWindowStorage:
         """
         X = "(\S+):\/(\S+)"
         c = re.compile(X).search(widget.get_text())
-        self.builder.get_object("finishnewstorage").set_sensitive(c != None)
+        self.builder.get_object("finishnewstorage").set_sensitive(c is not None)
 
     def on_txtnewstgnfspath_changed(self, widget, data=None):
         """
@@ -536,7 +522,8 @@ class oxcWindowStorage:
         """
         X = "(\S+):\/(\S+)"
         c = re.compile(X).search(widget.get_text())
-        self.builder.get_object("btnewstgsnfsscan").set_sensitive(c != None)
+        self.builder.get_object("btnewstgsnfsscan").set_sensitive(c is not None)
+
     def on_btdiscoveriqns_clicked(self, widget, data=None):
         """
         Function called when you press on "Discover IQNs" button on new storage (scsi)
@@ -552,13 +539,15 @@ class oxcWindowStorage:
         combotargetiqn = self.builder.get_object("combotargetiqn")
         listtargetiqn = self.builder.get_object("listtargetiqn")
         # fill_iscsi_target_iqn fills the combo with possible iqn targets and return True if something was found
-        if self.xc_servers[self.selected_host].fill_iscsi_target_iqn(self.selected_ref, listtargetiqn, \
-                target, iscsiport, user, password):
+        if self.xc_servers[self.selected_host].fill_iscsi_target_iqn(
+                self.selected_ref, listtargetiqn, target, iscsiport, user,
+                password):
             # Set the first as default
-            combotargetiqn.set_active(0) 
+            combotargetiqn.set_active(0)
             self.builder.get_object("btdiscoverluns").set_sensitive(True)
         else:
             self.builder.get_object("btdiscoverluns").set_sensitive(False)
+
     def on_btdiscoverluns_clicked(self, widget, data=None):
         """
         Function called when you press on "Discover LUNs" button on new storage (scsi)
@@ -577,11 +566,12 @@ class oxcWindowStorage:
         listtargetlun = self.builder.get_object("listtargetlun")
         targetiqn = listtargetiqn.get_value(combotargetiqn.get_active_iter(), 0)
         # fill_iscsi_target_lun fills the combo with possible luns and return True if something was found
-        if self.xc_servers[self.selected_host].fill_iscsi_target_lun(self.selected_ref, listtargetlun, \
-                target, targetiqn, iscsiport, user, password):
+        if self.xc_servers[self.selected_host].fill_iscsi_target_lun(
+                self.selected_ref, listtargetlun, target, targetiqn, iscsiport,
+                user, password):
             # Set the first as default
             # TODO: detect if uuid is in use
-            combotargetlun.set_active(0) 
+            combotargetlun.set_active(0)
             self.builder.get_object("finishnewstorage").set_sensitive(True)
         else:
             self.builder.get_object("finishnewstorage").set_sensitive(False)
@@ -592,12 +582,14 @@ class oxcWindowStorage:
         """
         # Hide if is unchecked
         self.builder.get_object("framechap").set_sensitive(widget.get_active())
+
     def on_txtiscsitarget_changed(self, widget, data=None):
         """
         Function called when text changed on "target host" on "new storage" (iscsi)
         """
         # Disable or enabled "Discover IQNs" button
         self.builder.get_object("btdiscoveriqns").set_sensitive(len(widget.get_text()) > 0)
+
     def on_btstgnewdisk_clicked(self, widget, data=None):
         """"
         Function called when you press "new disk" on storage
@@ -617,21 +609,20 @@ class oxcWindowStorage:
         self.builder.get_object("disksize2").set_value(float(5))
         # Show the "add new disk" window
         vmaddnewdisk.show()
+
     def on_radionewstgnfsvhd_group_changed(self, widget, data=None):
         """
         Function called when you select a type the storage on "new storage" window
         """
-        if widget.get_active():
-            texts = {  # TODO: Move these text descriptions to a separate file
-                    "radionewstgnfsvhd" : "NFS servers are a common form of shared filesystem infrastructure, and can be used as a storage repository substrate for virtual disks.\n\nAs NFS storage repositories are shared, the virtual disks stored in them allow VMs to be started on any server in a resource pool and to be migrated between them using XenMotion.\n\nWhen you configure an NFS storage repository, you simply provide the hostname or IP address of the NFS server and the path to a directory that will be used to contain the storage repository. The NFS server must be configured to export the specified path to all servers in the pool",
-                    "radionewstgiscsi" : "Shared Logical Volume Manager (LVM) support is available using either iSCSI or Fibre Channel access to a shared LUN.\n\nUsing the LVM-based shared SR provides the same performance benefits as unshared LVM for local disk storage, however in the shared context, iSCSI or Fibre Channel-based SRs enable VM agility -- VMs may be started on any server in a pool and migrated between them.",
-                    "radionewstghwhba" : "XenServer Hosts support Fibre Channel (FC) storage area networks (SANs) through Emulex or QLogic host bus adapters (HBAs).\n\nAll FC configuration required to expose a FC LUN to the host must be completed manually, including storage devices, network devices, and the HBA within the XenServer host.\n\nOnce all FC configuration is complete the HBA will expose a SCSI device backed by the FC LUN to the host. The SCSI device can then be used to access to the FC LUN as if it were a locally attached SCSI device.",
-                    "radionewstgnetapp" : "Main developer of openxenmanager hasn't NetApp and hasn't Essentials",
-                    "radionewstgdell" : "Main developer of openxenmanager hasn't Dell EqualLogic and hasn't Essentials",
-                    "radionewstgcifs" :  "Select this option if you have a library of VM installation ISO images available as a Windows File Sharing share that you wish to attach to your host or pool.",
-                    "radionewstgnfsiso": "Select this option if you have a library of VM installation ISO images available as a NFS share that you wish to attach to your host or pool.",
-                    "radionewstgaoe": "ATA over Ethernet (AoE) is a network protocol designed for simple, high-performance access of SATA storage devices over Ethernet networks. It gives the possibility to build SANs with low-cost, standard technologies."
-            }
+        if widget.get_active():  # TODO: Move these text descriptions to a separate file
+            texts = {"radionewstgnfsvhd": "NFS servers are a common form of shared filesystem infrastructure, and can be used as a storage repository substrate for virtual disks.\n\nAs NFS storage repositories are shared, the virtual disks stored in them allow VMs to be started on any server in a resource pool and to be migrated between them using XenMotion.\n\nWhen you configure an NFS storage repository, you simply provide the hostname or IP address of the NFS server and the path to a directory that will be used to contain the storage repository. The NFS server must be configured to export the specified path to all servers in the pool",
+                     "radionewstgiscsi": "Shared Logical Volume Manager (LVM) support is available using either iSCSI or Fibre Channel access to a shared LUN.\n\nUsing the LVM-based shared SR provides the same performance benefits as unshared LVM for local disk storage, however in the shared context, iSCSI or Fibre Channel-based SRs enable VM agility -- VMs may be started on any server in a pool and migrated between them.",
+                     "radionewstghwhba": "XenServer Hosts support Fibre Channel (FC) storage area networks (SANs) through Emulex or QLogic host bus adapters (HBAs).\n\nAll FC configuration required to expose a FC LUN to the host must be completed manually, including storage devices, network devices, and the HBA within the XenServer host.\n\nOnce all FC configuration is complete the HBA will expose a SCSI device backed by the FC LUN to the host. The SCSI device can then be used to access to the FC LUN as if it were a locally attached SCSI device.",
+                     "radionewstgnetapp": "Main developer of openxenmanager hasn't NetApp and hasn't Essentials",
+                     "radionewstgdell": "Main developer of openxenmanager hasn't Dell EqualLogic and hasn't Essentials",
+                     "radionewstgcifs": "Select this option if you have a library of VM installation ISO images available as a Windows File Sharing share that you wish to attach to your host or pool.",
+                     "radionewstgnfsiso": "Select this option if you have a library of VM installation ISO images available as a NFS share that you wish to attach to your host or pool.",
+                     "radionewstgaoe": "ATA over Ethernet (AoE) is a network protocol designed for simple, high-performance access of SATA storage devices over Ethernet networks. It gives the possibility to build SANs with low-cost, standard technologies."}
             name = gtk.Buildable.get_name(widget)
             # Set the info text
             self.builder.get_object("newstorageinfo").set_text(texts[name])
@@ -668,30 +659,32 @@ class oxcWindowStorage:
         time = event.time
         pthinfo = widget.get_path_at_pos(x, y)
         if pthinfo is not None:
-           path, col, cellx, celly = pthinfo
-           widget.grab_focus()
-           widget.set_cursor( path, col, 0)
-           iter = self.builder.get_object("liststg").get_iter(path)
-           self.selected_vdi_ref = self.builder.get_object("liststg").get_value(iter, 0)
-           operations = self.xc_servers[self.selected_host].all['VDI'][self.selected_vdi_ref]['allowed_operations']
-           # If have "destroy" option in "allowed_operations"
-           if operations.count("destroy"):
-               # Enable button
-               self.builder.get_object("btstgremove").set_sensitive(True)
-           else:
-               # Else disable it
-               self.builder.get_object("btstgproperties").set_sensitive(True)
-           is_snapshot = self.xc_servers[self.selected_host].all['VDI'][self.selected_vdi_ref]['is_a_snapshot']
-           # If not is a snapshot, enable "properties" button
-           self.builder.get_object("btstgproperties").set_sensitive(not is_snapshot)
+            path, col, cellx, celly = pthinfo
+            widget.grab_focus()
+            widget.set_cursor(path, col, 0)
+            iter = self.builder.get_object("liststg").get_iter(path)
+            self.selected_vdi_ref = self.builder.get_object("liststg").get_value(iter, 0)
+            operations = self.xc_servers[self.selected_host].all['VDI'][self.selected_vdi_ref]['allowed_operations']
+            # If have "destroy" option in "allowed_operations"
+            if operations.count("destroy"):
+                # Enable button
+                self.builder.get_object("btstgremove").set_sensitive(True)
+            else:
+                # Else disable it
+                self.builder.get_object("btstgproperties").set_sensitive(True)
+            is_snapshot = self.xc_servers[self.selected_host].all['VDI'][self.selected_vdi_ref]['is_a_snapshot']
+            # If not is a snapshot, enable "properties" button
+            self.builder.get_object("btstgproperties").set_sensitive(not is_snapshot)
+
     def on_dialogdeletevdi_cancel_activate(self, widget, data=None):
         """
-        Function called when you cancel "dialog delete" 
+        Function called when you cancel "dialog delete"
         """
         self.builder.get_object("dialogdeletevdi").hide()
+
     def on_dialogdeletevdi_accept_activate(self, widget, data=None):
         """
-        Function called when you accept "dialog delete" 
+        Function called when you accept "dialog delete"
         """
         vdi = self.xc_servers[self.selected_host].all['VDI'][self.selected_vdi_ref]
         if vdi['is_a_snapshot']:
@@ -708,3 +701,30 @@ class oxcWindowStorage:
             self.xc_servers[self.selected_host].delete_vdi(self.selected_vdi_ref, vm_ref)
         # Hide the dialog
         self.builder.get_object("dialogdeletevdi").hide()
+
+    def get_iscsi_con_details(self):
+        """
+        Get all the required iscsi information
+        """
+        details = {'chap': {'user': None, 'secret': None},
+                   'name': self.builder.get_object("txtiscsiname").get_text(),
+                   'host': self.builder.get_object("txtiscsiport").get_text(),
+                   'port': self.builder.get_object("txtiscsiport").get_text()}
+
+        if self.builder.get_object("checkscsichap").get_active():
+            details['chap']['user'] = self.builder.get_object(
+                "txtiscsichapuser").get_text()
+            details['chap']['secret'] = self.builder.get_object(
+                "txtiscsichapsecret").get_text()
+
+        combotargetiqn = self.builder.get_object("combotargetiqn")
+        combotargetlun = self.builder.get_object("combotargetlun")
+        listtargetiqn = self.builder.get_object("listtargetiqn")
+        listtargetlun = self.builder.get_object("listtargetlun")
+
+        details['target']['iqn'] = listtargetiqn.get_value(
+            combotargetiqn.get_active_iter(), 0)
+        details['target']['lun'] = listtargetlun.get_value(
+            combotargetlun.get_active_iter(), 0)
+
+        return details
