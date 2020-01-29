@@ -22,6 +22,9 @@
 import os
 import sys
 import shutil
+import pygtk
+import pango
+
 from configobj import ConfigObj
 from tunnel import Tunnel
 
@@ -185,7 +188,11 @@ class oxcWindow(oxcWindowVM, oxcWindowHost, oxcWindowProperties,
         self.builder.set_translation_domain("oxc")
         # Add the glade files to gtk.Builder object
         for g_file in glade_files:
-            self.builder.add_from_file(g_file)
+            try:
+                self.builder.add_from_file(g_file)
+            except:
+                print "While loading Glade GUI Builder file \"" + g_file + "\" a duplicate entry was found:"
+                raise
 
         # Connect Windows and Dialog to delete-event (we want not destroy dialog/window)
         # delete-event is called when you close the window with "x" button
@@ -213,6 +220,14 @@ class oxcWindow(oxcWindowVM, oxcWindowHost, oxcWindowProperties,
         self.listprop = self.builder.get_object("listprop")
         self.statusbar = self.builder.get_object("statusbar1")
         self.treesearch = self.builder.get_object("treesearch")
+        self.treestg = self.builder.get_object("treestg")
+
+        #Tunnel and VNC pid dicts
+        self.tunnel = {}
+        self.vnc_process = {} #used in osx
+        self.vnc = {}
+        self.vnc_builders = {} #used to store vnc pygtk builders for the different windows in Linux
+
         """
         for i in range(0,7):
             if self.newvm.get_nth_page(i):
@@ -226,6 +241,8 @@ class oxcWindow(oxcWindowVM, oxcWindowHost, oxcWindowProperties,
         ''')
 
         self.builder.connect_signals(self)
+
+        self.treestg.get_selection().connect('changed', self.on_treestg_selection_changed)
 
         # Create a new TreeStore
         self.treestore = gtk.TreeStore(gtk.gdk.Pixbuf, str, str, str, str, str, str, object, str)
@@ -438,6 +455,24 @@ class oxcWindow(oxcWindowVM, oxcWindowHost, oxcWindowProperties,
         # Manual function to set the default buttons on dialogs/window 
         # Default buttons could be pressed with enter without need do click
         self.set_window_defaults()
+
+        # Make the background of the tab box, and its container children white
+        tabbox = self.builder.get_object("tabbox")
+        tabbox.modify_bg(gtk.STATE_NORMAL, gtk.gdk.Color('#FFFFFF'))
+
+        #for tab_box_child in tabbox.get_children():
+        self.recursive_set_bg_color(tabbox)
+        
+        # To easily modify and provide a consistent section header look in the
+        # main_window: I've named all EventBoxes main_section_header#. Iterate through
+        # them until we get a NoneType
+        section_header_string = "main_section_header"
+        section_header_index = 1
+        while 1:
+            done = self.prettify_section_header(section_header_string + str(section_header_index))
+            if(done is None):
+                break
+            section_header_index = section_header_index + 1
         
         # If we need a master password for connect to servers without password:
         # Show the dialog asking master password
@@ -448,12 +483,52 @@ class oxcWindow(oxcWindowVM, oxcWindowHost, oxcWindowProperties,
             self.builder.get_object('consolescale').hide()
 
         self.windowmap = MyDotWindow(self.builder.get_object("viewportmap"), self.treestore, self.treeview)
-        
-    def adjust_scrollbar_performance(self):
-        for widget in ["scrwin_cpuusage", "scrwin_memusage", "scrwin_netusage", "scrwin_diskusage"]:
-            self.builder.get_object(widget).grab_focus()
-            adj = self.builder.get_object(widget).get_hadjustment()
-            adj.set_value(adj.upper - adj.page_size)
+    
+    # Recursive function to set the background colour on certain objects
+    def recursive_set_bg_color(self, widget):
+        for child in widget.get_children():
+            # Is a storage container, dive into it
+            if isinstance(child, gtk.Container):
+                self.recursive_set_bg_color(child)
+                # Is a specific type of widget
+                child.modify_bg(gtk.STATE_NORMAL, gtk.gdk.Color('#FFFFFF'))
+
+    # Add a common theme to the section header areas
+    def prettify_section_header(self, widget_name):
+        if type(widget_name) is not str:
+            return None
+
+        section_header = self.builder.get_object(widget_name)
+        if(section_header is None):
+            return None
+
+        # Make the event boxes window visible and set the background color
+        section_header.set_visible_window(True)
+        section_header.modify_bg(gtk.STATE_NORMAL, gtk.gdk.Color('#3498db'))
+
+        child_list = section_header.get_children()
+        if child_list is not None:
+            for child in child_list:
+                if child is not None:
+                    if type(child) == gtk.Label:
+                        child.modify_fg(gtk.STATE_NORMAL, gtk.gdk.Color('#FFFFFF'))
+
+                        # Preserve attributes set within Glade.
+                        child_attributes = child.get_attributes()
+                        if child_attributes is None:
+                            child_attributes = pango.AttrList()
+
+                        # Add/modify a few attributes
+                        child_attributes.change(pango.AttrScale(pango.SCALE_XX_LARGE, 0, -1))
+                        child.set_attributes(child_attributes)
+        return True
+    
+    # todo: James - When we're done redoing the performance tab let's do this on any new scrollbars created
+    #def adjust_scrollbar_performance(self):
+    #    for widget in ["scrwin_cpuusage", "scrwin_memusage", "scrwin_netusage", "scrwin_diskusage"]:
+    #        self.builder.get_object(widget).grab_focus()
+    #        adj = self.builder.get_object(widget).get_hadjustment()
+    #        adj.set_value(adj.upper - adj.page_size)
 
     def func_cell_data_treesearch(self, column, cell, model, iter_ref, user_data):
         # Test function don't used TODO: Can this be removed?
@@ -607,7 +682,7 @@ class oxcWindow(oxcWindowVM, oxcWindowHost, oxcWindowProperties,
             win32gui.MoveWindow(self.hWnd, x, y, console_alloc.width-10, console_alloc.height-5, 1)
         
     def on_console_area_key_press_event(self, widget, event):
-        self.tunnel.key = hex(event.hardware_keycode - 8)
+        self.tunnel[self.selected_ref].key = hex(event.hardware_keycode - 8)
 
     def on_aboutdialog_close(self, widget, data=None):
         """
@@ -886,7 +961,8 @@ class oxcWindow(oxcWindowVM, oxcWindowHost, oxcWindowProperties,
         """
         # For each server
         if self.tunnel:
-            self.tunnel.close()
+            for key in self.tunnel.keys():
+                self.tunnel[key].close()
 
         for sh in self.xc_servers:
             # Stop the threads setting True the condition variables
@@ -906,8 +982,14 @@ class oxcWindow(oxcWindowVM, oxcWindowHost, oxcWindowProperties,
         self.config.write()
         # Exit!
         gtk.main_quit()
-        if self.tunnel:
-            self.tunnel.close()
+        if self.vnc_process:
+            for process in self.vnc_process.keys():
+                #Kill all running sub_processes
+                if self.vnc_process[process].poll() != 0:
+                    os.killpg(os.getpgid(self.vnc_process[process].pid), signal.SIGTERM)
+        #Force Quit
+        os._exit(0)
+        return
 
     def save_pane_position(self):
         """
@@ -943,17 +1025,28 @@ class oxcWindow(oxcWindowVM, oxcWindowHost, oxcWindowProperties,
                 # If vnc console was opened and we change to another, close it
                 # Disable the send ctrl-alt-del menu item
                 self.builder.get_object("menuitem_tools_cad").set_sensitive(False)
-                if hasattr(self, "vnc") and self.vnc and not self.noclosevnc:
-                    self.vnc.destroy()
+                if hasattr(self, "vnc") and self.vnc and not self.noclosevnc and not eval(self.config["options"]["multiple_vnc"]):
+                    for key in self.vnc:
+                        self.vnc[key].destroy()
                     self.builder.get_object("windowvncundock").hide()
-                    self.vnc = None
+                    self.vnc = {}
                 # Same on Windows
                 if sys.platform == 'win32' and self.hWnd != 0:
                     if win32gui.IsWindow(self.hWnd):
                         win32gui.PostMessage(self.hWnd, win32con.WM_CLOSE, 0, 0)
                     self.hWnd = 0
-                if self.tunnel and not self.noclosevnc:
-                    self.tunnel.close()
+
+                if self.tunnel and not self.noclosevnc and not eval(self.config["options"]["multiple_vnc"]):
+                    for key in self.tunnel:
+                        self.tunnel[key].close()
+                    self.tunnel = {}
+
+                if self.vnc_builders and not eval(self.config["options"]["multiple_vnc"]):
+                    for key in self.vnc_builders:
+                        self.vnc_builders[key].get_object("console_area3").remove(self.vnc[key])
+                        self.vnc_builders[key].get_object("windowvncundock").destroy()
+                    self.vnc_builders = {}
+
                 if tab_label != "HOST_Search" and host:
                     # If we change tab to another different to HOST Search, then stop the filling thread
                         self.xc_servers[host].halt_search = True
@@ -963,12 +1056,15 @@ class oxcWindow(oxcWindowVM, oxcWindowHost, oxcWindowProperties,
             if tab_label == "VM_Console":
                 self.builder.get_object("menuitem_tools_cad").set_sensitive(True)
                 self.treeview = self.builder.get_object("treevm")
-                if hasattr(self, "vnc") and self.vnc:
+                if hasattr(self, "vnc") and self.vnc and not eval(self.config["options"]["multiple_vnc"]):
                     if self.tunnel:
-                        self.tunnel.close()
-                    self.vnc.destroy()
+                        for key in self.tunnel:
+                            self.tunnel[key].close()
+                        self.tunnel = {}
+                    for key in self.vnc:
+                        self.vnc[key].destroy()
                     self.builder.get_object("windowvncundock").hide()
-                    self.vnc = None
+                    self.vnc = {}
 
                 if self.treeview.get_cursor()[1]:
                     state = self.selected_state
@@ -983,53 +1079,61 @@ class oxcWindow(oxcWindowVM, oxcWindowHost, oxcWindowProperties,
 
                         location = self.get_console_location(host, ref)
 
-                        if location is not None:
-                            self.tunnel = Tunnel(self.xc_servers[host].session_uuid, location)
-                            port = self.tunnel.get_free_port()
+                        if location is not None and ( self.selected_ref not in self.tunnel.keys() or ( self.selected_ref in self.vnc_process.keys() and self.vnc_process[self.selected_ref].poll() == 0)):
+                            self.tunnel[self.selected_ref] = Tunnel(self.xc_servers[host].session_uuid, location)
+                            port = self.tunnel[self.selected_ref].get_free_port()
 
                             if port is not None:
-                                Thread(target=self.tunnel.listen, args=(port,)).start()
+                                Thread(target=self.tunnel[self.selected_ref].listen, args=(port,)).start()
                                 time.sleep(1)
                             else:
                                 # TODO: Break here on error
                                 print 'Could not get a free port'
 
                             if sys.platform != "win32" and sys.platform != "darwin":
+                                if self.vnc and self.selected_ref in self.vnc.keys(): self.vnc[self.selected_ref]
                                 # Create a gtkvnc object
-                                self.vnc = gtkvnc.Display()
+                                self.vnc[self.selected_ref] = gtkvnc.Display()
                                 # Add to gtkvnc to a console area
                                 console_area = self.builder.get_object("console_area")
-
-                                console_area.add(self.vnc)
+                                if hasattr(self, "current_vnc"):
+                                    console_area.remove(self.current_vnc)
+                                # Define current VNC window
+                                self.current_vnc = self.vnc[self.selected_ref]
+                                # Add it to the console area
+                                console_area.add(self.vnc[self.selected_ref])
                                 console_area.show_all()
 
-                                self.vnc.activate()
-                                self.vnc.grab_focus()
-                                self.vnc.set_pointer_grab(False)
-                                self.vnc.set_pointer_local(False)
-                                self.vnc.set_keyboard_grab(True)
-                                self.vnc.set_shared_flag(True)
-                                self.vnc.connect("vnc-disconnected", self.vnc_disconnected)
-                                self.vnc.connect("key_press_event", self.on_console_area_key_press_event)
+                                self.vnc[self.selected_ref].activate()
+                                self.vnc[self.selected_ref].grab_focus()
+                                self.vnc[self.selected_ref].set_pointer_grab(False)
+                                self.vnc[self.selected_ref].set_pointer_local(False)
+                                self.vnc[self.selected_ref].set_keyboard_grab(True)
+                                self.vnc[self.selected_ref].set_shared_flag(True)
+                                self.vnc[self.selected_ref].connect("vnc-disconnected", self.vnc_disconnected)
+                                self.vnc[self.selected_ref].connect("key_press_event", self.on_console_area_key_press_event)
 
                                 # And open the connection
                                 try:
-                                    self.vnc.set_depth(1)
+                                    self.vnc[self.selected_ref].set_depth(1)
                                 except RuntimeError:
                                     pass
 
-                                self.vnc.connect("vnc-server-cut-text", self.vnc_button_release)
-                                self.vnc.open_host("localhost", str(port))
+                                self.vnc[self.selected_ref].connect("vnc-server-cut-text", self.vnc_button_release)
+                                self.vnc[self.selected_ref].open_host("localhost", str(port))
 
                             elif sys.platform == "darwin":
                                 # Run ./vncviewer with host, vm renf and session ref
                                 viewer = self.config['options']['vnc_viewer']
-                                os.spawnl(os.P_NOWAIT, viewer, "vncviewer", "localhost::%s" % port)
-                                console_area = self.builder.get_object("console_area")
-                                console_alloc = console_area.get_allocation()
+                                if viewer and os.path.exists(viewer):
+                                    self.vnc_process[self.selected_ref] = Popen([viewer,"localhost::%s" % port],shell=False,preexec_fn=os.setsid)
+                                    console_area = self.builder.get_object("console_area")
+                                    console_alloc = console_area.get_allocation()
+                                else:
+                                    print "No VNC detected or VNC executable path does not exist"
 
                             else:
-                                Thread(target=self.tunnel.listen, args=(port,)).start()
+                                Thread(target=self.tunnel[self.selected_ref].listen, args=(port,)).start()
                                 time.sleep(1)
                                 # And open the connection
                                 # TODO: Add the capability to change this path in the options and save to config
@@ -1068,7 +1172,17 @@ class oxcWindow(oxcWindowVM, oxcWindowHost, oxcWindowProperties,
                                     print 'Could not retrieve the window ID'
 
                         else:
-                            print 'No console available'
+                            if sys.platform != "win32" and sys.platform != "darwin" and eval(self.config["options"]["multiple_vnc"]):
+                                console_area = self.builder.get_object("console_area")
+                                if hasattr(self, "current_vnc"):
+                                    console_area.remove(self.current_vnc)
+                                # Define current VNC window
+                                self.current_vnc = self.vnc[self.selected_ref]
+                                # Add it to the console area
+                                console_area.add(self.vnc[self.selected_ref])
+                                console_area.show_all()
+                            else:
+                                print 'No console available'
                     else:
                         print state
 
@@ -1106,7 +1220,7 @@ class oxcWindow(oxcWindowVM, oxcWindowHost, oxcWindowProperties,
                     # Fill the list of snapshots
                     self.xc_servers[host].fill_vm_snapshots(self.selected_ref, treevmsnapshots, listvmsnapshots)
             elif tab_label == "VM_Performance":
-                if self.treeview.get_cursor()[1]:
+                if self.treeview.get_cursor()[1]:   # Get which VM is selected in the left list
                     # Thread to update performance images
                     ref = self.selected_ref
                     if self.selected_type == "vm":
@@ -1176,6 +1290,7 @@ class oxcWindow(oxcWindowVM, oxcWindowHost, oxcWindowProperties,
 
                     # Call to update_tab_host_nics to fill the host nics
                     self.update_tab_host_nics()
+                    
             elif tab_label == "HOST_Search":
                 if self.treeview.get_cursor()[1]:
                     self.xc_servers[host].halt_search = False
@@ -1551,6 +1666,19 @@ class oxcWindow(oxcWindowVM, oxcWindowHost, oxcWindowProperties,
 
     def vnc_disconnected(self, info): 
         print "VNC disconnected..", info
+        #We need to find which one of the open vnc windows was disconnected in order to remove it from the stored dictionaries
+        disconnected_vnc = None
+        if self.vnc and eval(self.config["options"]["multiple_vnc"]):
+            for key in self.vnc:
+                if self.vnc[key] == info: disconnected_vnc = key; break
+            if disconnected_vnc:
+                if disconnected_vnc in self.vnc_builders:
+                    #This will hook to the destroy method so there is no need to remove the key from the dict
+                    #TODO handle the reboot in the window itself
+                    self.vnc_builders[disconnected_vnc].get_object("windowvncundock").destroy()
+
+                if disconnected_vnc in self.vnc.keys(): del self.vnc[disconnected_vnc]
+                if disconnected_vnc in self.tunnel.keys(): del self.tunnel[disconnected_vnc]
 
     def on_txttreefilter_changed(self, widget, data=None):
         """

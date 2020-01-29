@@ -25,9 +25,11 @@ import struct
 try:
     import raven
     RAVEN_AVAILABLE = True
+    print('Raven available - Enabling logging')
 except ImportError:
     # raven is not installed with deb package in order to simplify packaging
     RAVEN_AVAILABLE = False
+    print('Raven not available - Logging not enabled')
 
 from .version import __version__
 
@@ -41,8 +43,7 @@ class CrashReport:
     Report crash to a third party service
     """
 
-    DSN = "sync+https://e59b1dfe6c2e48a4a115cad7012f5e5e:b00d1730c16f4c84a13" \
-          "3d7661209718e@sentry.serverb.co.uk/2"
+    DSN = "https://a172d907f69a42aa8f4de42e9adb76fd:39fdcc5d494e4d78b49d2b7d1c4681de@sentry.io/261127"
     if hasattr(sys, "frozen"):
         cacert = os.path.join(os.getcwd(), "cacert.pem")
         if os.path.isfile(cacert):
@@ -63,20 +64,24 @@ class CrashReport:
             if self._client is None:
                 self._client = raven.Client(CrashReport.DSN,
                                             release=__version__)
-            self._client.tags_context({
-                "os:name": platform.system(),
-                "os:release": platform.release(),
-                "os:win_32": " ".join(platform.win32_ver()),
-                "os:mac": "{} {}".format(platform.mac_ver()[0],
-                                         platform.mac_ver()[2]),
-                "os:linux": " ".join(platform.linux_distribution()),
-                "python:version": "{}.{}.{}".format(sys.version_info[0],
+
+            tags = {"os:name": platform.system(),
+                    "os:release": platform.release(),
+                    "python:version": "{}.{}.{}".format(sys.version_info[0],
                                                     sys.version_info[1],
                                                     sys.version_info[2]),
-                "python:bit": struct.calcsize("P") * 8,
-                "python:encoding": sys.getdefaultencoding(),
-                "python:frozen": "{}".format(hasattr(sys, "frozen"))
-            })
+                    "python:bit": struct.calcsize("P") * 8,
+                    "python:encoding": sys.getdefaultencoding(),
+                    "python:frozen": "{}".format(hasattr(sys, "frozen"))}
+
+            if sys.platform == 'win32':
+                tags['os:win32'] = " ".join(platform.win32_ver())
+            elif sys.platform == 'darwin':
+                tags['os:mac'] = "{} {}".format(platform.mac_ver()[0], platform.mac_ver()[2])
+            else:
+                tags['os:linux'] = " ".join(platform.linux_distribution())
+
+            self._client.tags_context(tags)
             try:
                 report = self._client.captureException((exception, value, tb))
             except Exception as e:

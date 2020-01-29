@@ -925,7 +925,10 @@ class oxcWindowMenuItem:
             self.builder.get_object(widget).set_sensitive(True)
         self.reattach_storage = False
         self.builder.get_object("nextnewstorage").set_sensitive(True)
-        self.builder.get_object("eventnewstg0").modify_bg(gtk.STATE_NORMAL, blue)
+        # TODO: James GUI - I disabled the following line to continue fixing the storage.glade file
+        # 		I'll need to reimplement this colour highlighting thing as it doesn't work anyway 
+        #		and this is a tad ugly.
+        # self.builder.get_object("eventnewstg0").modify_bg(gtk.STATE_NORMAL, blue)
         self.builder.get_object("tabboxnewstorage").set_current_page(0)
         self.builder.get_object("newstorage").show() 
 
@@ -1019,12 +1022,12 @@ class oxcWindowMenuItem:
         """
         "Send Ctrl-Alt-Del" menu item is pressed (tools menu)
         """
-        self.tunnel.send_data("\xfe\x01\x00\x00\x00\x00\x00\x1d")
-        self.tunnel.send_data("\xfe\x01\x00\x00\x00\x00\x00\x38")
-        self.tunnel.send_data("\xfe\x01\x00\x00\x00\x00\x00\xd3")
-        self.tunnel.send_data("\xfe\x00\x00\x00\x00\x00\x00\x1d")
-        self.tunnel.send_data("\xfe\x00\x00\x00\x00\x00\x00\x38")
-        self.tunnel.send_data("\xfe\x00\x00\x00\x00\x00\x00\xd3")
+        self.tunnel[data].send_data("\xfe\x01\x00\x00\x00\x00\x00\x1d")
+        self.tunnel[data].send_data("\xfe\x01\x00\x00\x00\x00\x00\x38")
+        self.tunnel[data].send_data("\xfe\x01\x00\x00\x00\x00\x00\xd3")
+        self.tunnel[data].send_data("\xfe\x00\x00\x00\x00\x00\x00\x1d")
+        self.tunnel[data].send_data("\xfe\x00\x00\x00\x00\x00\x00\x38")
+        self.tunnel[data].send_data("\xfe\x00\x00\x00\x00\x00\x00\xd3")
 
     def on_menuitem_migratetool_activate(self, widget, data=None):
         """

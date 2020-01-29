@@ -1,17 +1,3 @@
-IMPORTANT INFORMATION!
-======================
-I have setup and integrated Sentry into OpenXenManager. Sentry will 
-automatically capture and upload all crashes that occur within OXM.
-
-I will be providing an option to disable this via the options, but it would be 
-very useful for me to have this information to help find bugs that are lurking 
-deep within OXM.
-
-All that is needed is to install the raven package via pip, which handles the 
-processing of the crash reports.
-
-Thankyou!
-
 OpenXenManager introduction
 ===========================
 OpenXenManager is a full-featured graphical interface to manage Citrix
@@ -36,10 +22,19 @@ Requirements:
 * Python 2.7
 * pyGTK 2.16
 * ConfigObj
+* Raven
 * GTK-VNC (Linux only)
  
-Linux package dependencies:
-python2.7 python-gtk2 glade python-gtk-vnc python-glade2 python-configobj
+Debian/Ubuntu Linux package dependencies:
+python2.7 python-gtk2 glade python-gtk-vnc python-glade2 python-configobj python-setuptools python-raven
+
+Gentoo Linux package dependencies:
+dev-python/pygtk dev-python/configobj net-libs/gtk-vnc dev-lang/python:2.7 dev-python/raven  (remember to set "python" USE flag for gtk-vnc!)
+
+macOS dependencies:  
+[brew](http://brew.sh/) install pygtk  
+pip install configobj
+pip install raven
 
 OpenXenManager runs has been tested to run on Linux or Windows and should work
 on MacOSX as well.
@@ -50,6 +45,11 @@ Help / bug reports
 
 If you have found a bug, please file a detailed report in our bug tracker:
   https://github.com/OpenXenManager/openxenmanager/issues
+
+<img src="https://sentry-brand.storage.googleapis.com/sentry-logo-black.svg" alt="Sentry Logo" width="200px">
+
+In addition to submitting bug reports, we will be collecting crash data via Sentry.io 
+No personally identifying data is collected.
 
 For help you can:
 
@@ -64,7 +64,7 @@ Developers
 
 - Original Author: Alberto Gonzalez Rodriguez <alberto@pesadilla.org>
 - Previous Developer: Cheng Sun <chengsun9@gmail.com>
-- Current Developer: Daniel Lintott <daniel@serverb.co.uk>
+- Current Developer: Daniel Lintott <daniel.j.lintott@gmail.com>
 - Contributors:
   * Lars Hagström (DonOregano) <lars@foldspace.nu>
   * Sol Jerome (solj)
